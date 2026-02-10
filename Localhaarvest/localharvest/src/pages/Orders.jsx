@@ -1,16 +1,17 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { Trash2, ShoppingCart, CreditCard, ChevronRight, X, User, MapPin, Phone } from "lucide-react";
 
 function Orders({ orders, setCartItems, refreshProducts }) {
   const [removingIndex, setRemovingIndex] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Function to remove items and restore stock
   const removeItem = async (indexToRemove) => {
     const itemToRemove = orders[indexToRemove];
 
     try {
-        // ALWAYS try to restore stock, assuming it was deducted when added to cart
-        // We use itemToRemove.id which is the product ID
+        // Restore stock
         const response = await fetch(`http://localhost:3001/api/products/${itemToRemove.id}/stock`, {
              method: 'PUT',
              headers: { 'Content-Type': 'application/json' },
@@ -20,7 +21,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
         if (!response.ok) {
             console.error("Failed to restore stock");
         } else {
-             // If successful, refresh the global product list so Shop page reflects new stock
+             // Refresh products
              if (refreshProducts) refreshProducts();
         }
 
@@ -41,87 +42,6 @@ function Orders({ orders, setCartItems, refreshProducts }) {
     (sum, item) => sum + parseFloat(item.price || 0),
     0
   );
-
-  // ✅ Razorpay payment function
-  const handlePayment = async () => {
-    if (orders.length === 0) {
-      alert("Your cart is empty!");
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-
-      // 1️⃣ Create Razorpay order from backend
-      const res = await fetch(
-        "http://localhost:3001/api/payment/create-order",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: totalAmount,
-            currency: "INR",
-            orderId: new Date().getTime(),
-          }),
-        }
-      );
-
-      const data = await res.json();
-      if (!data.orderId) {
-        alert("Failed to create Razorpay order.");
-        setIsProcessing(false);
-        return;
-      }
-
-      // 2️⃣ Razorpay checkout options
-      const options = {
-        key: "rzp_test_yourkeyid", // 🔑 Replace with your Razorpay Test Key
-        amount: totalAmount * 100,
-        currency: "INR",
-        name: "LocalHarvest",
-        description: "Order Payment",
-        order_id: data.orderId,
-        handler: async function (response) {
-          try {
-            // 3️⃣ Verify payment with backend
-            const verifyRes = await fetch(
-              "http://localhost:3001/api/payment/verify",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(response),
-              }
-            );
-
-            const result = await verifyRes.json();
-            if (result.success) {
-              alert("✅ Payment Successful! Thank you for shopping.");
-              setCartItems([]); // clear cart
-            } else {
-              alert("❌ Payment verification failed. Please contact support.");
-            }
-          } catch (err) {
-            console.error("Error verifying payment:", err);
-            alert("Payment verification failed. Try again.");
-          }
-        },
-        prefill: {
-          name: "", // Optional: Add default name
-          email: "", // Optional: Add default email
-        },
-        theme: { color: "#4F46E5" },
-      };
-
-      // 4️⃣ Open Razorpay popup
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (error) {
-      console.error("Payment initiation failed:", error);
-      alert("Payment failed. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [address, setAddress] = useState({
@@ -149,223 +69,382 @@ function Orders({ orders, setCartItems, refreshProducts }) {
     }
     // Proceed to payment after address validation
     handlePayment();
-    // Optionally close modal here, or wait for payment to finish
-    setIsAddressModalOpen(false); 
+  };
+
+  // Notification Handler
+  const sendSoldNotifications = async () => {
+      try {
+          await fetch("http://localhost:3001/api/notifications/sold", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                  items: orders,
+                  buyerDetails: address
+              })
+          });
+      } catch (e) {
+          console.error("Failed to send notifications", e);
+      }
+  };
+
+  // Razorpay payment function
+  const handlePayment = async () => {
+    if (orders.length === 0) {
+      alert("Your cart is empty!");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setIsAddressModalOpen(false); // Close modal when starting payment logic
+
+      // 1️⃣ Create Razorpay order from backend
+      const res = await fetch(
+        "http://localhost:3001/api/payment/create-order",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: totalAmount,
+            currency: "INR",
+            orderId: new Date().getTime(),
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!data.orderId) {
+        alert("Failed to create Razorpay order.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2️⃣ Razorpay checkout options
+      const options = {
+        key: "rzp_test_yourkeyid", // 🔑 Replace correctly
+        amount: totalAmount * 100,
+        currency: "INR",
+        name: "LocalHarvest",
+        description: "Fresh Produce Order",
+        order_id: data.orderId,
+        handler: async function (response) {
+          try {
+            // 3️⃣ Verify payment with backend
+            const verifyRes = await fetch(
+              "http://localhost:3001/api/payment/verify",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              }
+            );
+
+            const result = await verifyRes.json();
+            if (result.success) {
+              // 4️⃣ Send Email Notifications
+              await sendSoldNotifications();
+
+              alert("✅ Payment Successful! Producers have been notified.");
+              setCartItems([]); // clear cart
+            } else {
+              alert("❌ Payment verification failed.");
+            }
+          } catch (err) {
+            console.error("Error verifying payment:", err);
+            alert("Payment verification failed.");
+          }
+        },
+        prefill: {
+          name: address.name,
+          email: "", 
+          contact: address.phone
+        },
+        theme: { color: "#10b981" },
+      };
+
+      // 4️⃣ Open Razorpay popup
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      console.error("Payment initiation failed:", error);
+      alert("Payment failed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
-    <div className="min-h-screen font-sans -mt-24">
-      {/* Animated background removed (in App.jsx) */}
+    <div className="min-h-screen font-sans pb-20">
+      
+      {/* Background Gradients */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-100/40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-100/40 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+      </div>
 
-      <div className="relative z-10 flex flex-col items-center py-20 px-4">
-        <h1 className="text-7xl font-black tracking-tight mb-12 text-slate-900 drop-shadow-sm">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600">
-            Your Cart
-          </span>
-        </h1>
+      <div className="relative z-10 flex flex-col items-center py-8 px-4 max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <div className="text-center mb-12 animate-fadeInUp">
+             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold uppercase tracking-wider mb-4 border border-emerald-100">
+                <ShoppingCart size={14} /> Checkout
+             </span>
+             <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900 leading-tight">
+                Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">Cart</span>
+             </h1>
+        </div>
 
         {orders.length === 0 ? (
-
-          <div className="text-center bg-white/80 backdrop-blur-xl p-16 rounded-3xl border border-emerald-100 shadow-xl w-full max-w-2xl">
-            <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center border border-emerald-200 mx-auto mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10 text-emerald-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
+          // Empty State
+          <div className="flex flex-col items-center justify-center p-12 bg-white/60 backdrop-blur-md rounded-3xl border border-dashed border-emerald-200 text-center max-w-lg w-full animate-fadeInUp">
+            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+                 <ShoppingCart size={40} className="text-emerald-300" />
             </div>
-            <h3 className="text-3xl font-bold text-slate-800 mb-2">
-              Your Cart is Empty
-            </h3>
-            <p className="text-slate-500 text-lg">
-              Looks like you haven't added anything yet!
-            </p>
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">Cart is Empty</h3>
+            <p className="text-slate-500 mb-8">Looks like you haven't added any fresh produce yet.</p>
             <Link to="/shop">
-              <button className="mt-6 text-white font-semibold px-6 py-3 rounded-2xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-400/40 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 cursor-pointer relative overflow-hidden group/btn tracking-wide">
-                <span className="relative z-10">Go Shopping</span>
+              <button className="flex items-center gap-2 text-white font-semibold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-500 hover:scale-[1.02] active:scale-[0.98]">
+                Go Shopping <ChevronRight size={18} />
               </button>
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-8 w-full">
-            <div className="bg-white/80 backdrop-blur-xl border border-emerald-100 rounded-3xl p-8 shadow-2xl shadow-emerald-500/10 w-full max-w-2xl flex flex-col gap-6">
-              <ul className="divide-y divide-slate-100">
-                {orders.map((item, index) => (
-                  <li
-                    key={index}
-                    className={`py-4 flex justify-between items-center transition-all duration-300 ease-in-out ${
-                      removingIndex === index
-                        ? "opacity-0 scale-95"
-                        : "opacity-100 scale-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                        {/* Optional: Add small thumbnail here if available */}
-                        <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center overflow-hidden">
-                             {item.image_url ? 
-                                <img src={`http://localhost:3001/${item.image_url}`} alt={item.name} className="w-full h-full object-cover"/> 
-                                : <span>📦</span>}
-                        </div>
-                        <span className="text-lg text-slate-800 font-medium">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">
-                        ₹{parseFloat(item.price || 0).toFixed(2)}
-                      </span>
-                      <button
-                        onClick={() => removeItem(index)}
-                        className="text-slate-400 hover:text-rose-500 font-bold text-2xl transition-colors duration-200 cursor-pointer"
-                      >
-                        &times;
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+          <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Cart Items List */}
+            <div className="lg:col-span-2 space-y-4 animate-fadeInUp">
+               <div className="bg-white/80 backdrop-blur-xl border border-emerald-100 rounded-3xl p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-6 pb-4 border-b border-emerald-50">
+                    <h2 className="text-xl font-bold text-slate-800">Order Items ({orders.length})</h2>
+                 </div>
 
-              <div className="flex justify-between items-center mt-6 pt-6 border-t border-slate-200">
-                <span className="text-xl font-bold text-slate-900">
-                  Total: ₹{totalAmount.toFixed(2)}
-                </span>
-                <button
-                  onClick={handleDeliverClick}
-                  disabled={isProcessing}
-                  className={`text-white font-semibold px-6 py-3 rounded-2xl transition-all duration-300 ease-out transform ${
-                    isProcessing
-                      ? "opacity-70 cursor-not-allowed"
-                      : "hover:scale-105"
-                  } active:scale-95 shadow-lg shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-400/40 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 cursor-pointer relative overflow-hidden group/btn tracking-wide`}
-                >
-                  <span className="relative z-10">
-                    Deliver
-                  </span>
-                </button>
-              </div>
+                 <ul className="space-y-4">
+                    {orders.map((item, index) => (
+                      <li
+                        key={index}
+                        className={`flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl transition-all duration-300 ${removingIndex === index ? "opacity-0 translate-x-10" : "hover:border-emerald-200 hover:shadow-md"}`}
+                      >
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                                 {item.image_url ? 
+                                    <img src={`http://localhost:3001/${item.image_url}`} alt={item.name} className="w-full h-full object-cover"/> 
+                                    : <span className="text-2xl">🥦</span>}
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">{item.name}</h3>
+                                <p className="text-slate-500 text-sm">₹{item.price} / unit</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <span className="font-bold text-emerald-700 text-lg">
+                            ₹{parseFloat(item.price || 0).toFixed(2)}
+                          </span>
+                          <button
+                            onClick={() => removeItem(index)}
+                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                            title="Remove"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                 </ul>
+               </div>
             </div>
 
-            <Link to="/shop">
-              <button className="text-white font-semibold px-6 py-3 rounded-2xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-400/40 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 cursor-pointer relative overflow-hidden group/btn tracking-wide">
-                <span className="relative z-10">Continue Shopping</span>
-              </button>
-            </Link>
+            {/* Order Summary */}
+            <div className="lg:col-span-1 animate-fadeInUp" style={{ animationDelay: "100ms" }}>
+                <div className="bg-white/90 backdrop-blur-xl border border-emerald-100 rounded-3xl p-8 shadow-xl shadow-emerald-500/5 sticky top-24">
+                    <h2 className="text-xl font-bold text-slate-800 mb-6">Order Summary</h2>
+                    
+                    <div className="space-y-3 mb-6">
+                        <div className="flex justify-between text-slate-600">
+                            <span>Subtotal</span>
+                            <span>₹{totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                            <span>Platform Fee</span>
+                            <span>₹{0}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                            <span>Delivery</span>
+                            <span className="text-emerald-600 font-medium">Free</span>
+                        </div>
+                        <div className="h-px bg-slate-100 my-4"></div>
+                        <div className="flex justify-between text-xl font-bold text-slate-800">
+                            <span>Total</span>
+                            <span>₹{totalAmount.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <button
+                      onClick={handleDeliverClick}
+                      disabled={isProcessing}
+                      className="w-full py-4 bg-slate-900 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-emerald-500/25 transition-all transform hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? "Processing..." : (
+                          <>Procced to Delivery <ChevronRight size={18} /></>
+                      )}
+                    </button>
+                    
+                    <p className="text-xs text-center text-slate-400 mt-4">
+                        Secure Payment Powered by Razorpay
+                    </p>
+                </div>
+            </div>
+
           </div>
         )}
       </div>
 
-       {/* Address Modal */}
+       {/* Styled Address Modal - SCROLLABLE OVERLAY */}
        {isAddressModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-fadeInUp">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-800">Delivery Details</h2>
-              <button onClick={() => setIsAddressModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <form onSubmit={handleAddressSubmit} className="p-8 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  name="name"
-                  value={address.name}
-                  onChange={handleAddressChange}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                  placeholder="John Doe"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Street Address</label>
-                <input 
-                  type="text" 
-                  name="street"
-                  value={address.street}
-                  onChange={handleAddressChange}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                  placeholder="123 Farm Lane"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
-                    <input 
-                    type="text" 
-                    name="city"
-                    value={address.city}
-                    onChange={handleAddressChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                    placeholder="New York"
-                    required
-                    />
+        <div className="fixed inset-0 z-[9999] overflow-y-auto pt-24 px-4 pb-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          {/* Flex container to center the modal */}
+          <div className="flex min-h-full items-start justify-center text-center sm:p-0">
+             
+              {/* Modal Card */}
+            <div className="relative w-full max-w-lg transform overflow-hidden rounded-[2rem] bg-white text-left shadow-xl transition-all animate-scaleIn mb-10">
+                
+                {/* Header */}
+                <div className="px-8 py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Delivery Details</h2>
+                        <p className="text-sm text-slate-500">Where should we send your fresh produce?</p>
+                    </div>
+                    <button 
+                        onClick={() => setIsAddressModalOpen(false)} 
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
+                    >
+                        <X size={20}/>
+                    </button>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
-                    <input 
-                    type="text" 
-                    name="state"
-                    value={address.state}
-                    onChange={handleAddressChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                    placeholder="NY"
-                    required
-                    />
-                </div>
-              </div>
-               <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Zip Code</label>
-                    <input 
-                    type="text" 
-                    name="zip"
-                    value={address.zip}
-                    onChange={handleAddressChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                    placeholder="10001"
-                    required
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                    <input 
-                    type="tel" 
-                    name="phone"
-                    value={address.phone}
-                    onChange={handleAddressChange}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none transition-all"
-                    placeholder="+91 9876543210"
-                    required
-                    />
-                </div>
-              </div>
 
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="w-full text-white font-bold text-lg px-6 py-4 rounded-xl transition-all duration-300 ease-out transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-emerald-500/30 hover:shadow-2xl hover:shadow-emerald-400/40 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 cursor-pointer relative overflow-hidden"
-                >
-                  {isProcessing ? "Processing..." : "Proceed to Pay"}
-                </button>
-              </div>
-            </form>
+                {/* Body */}
+                <div className="p-8">
+                    <form onSubmit={handleAddressSubmit} className="space-y-5">
+                        <div className="space-y-4">
+                            {/* Name */}
+                            <div className="relative group">
+                                <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors"/>
+                                <input 
+                                type="text" 
+                                name="name"
+                                value={address.name}
+                                onChange={handleAddressChange}
+                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all placeholder:text-slate-400"
+                                placeholder="Full Name"
+                                required
+                                />
+                            </div>
+
+                            {/* Street */}
+                            <div className="relative group">
+                                <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors"/>
+                                <input 
+                                type="text" 
+                                name="street"
+                                value={address.street}
+                                onChange={handleAddressChange}
+                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all placeholder:text-slate-400"
+                                placeholder="Street Address"
+                                required
+                                />
+                            </div>
+
+                            {/* Grid Fields */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <input 
+                                    type="text" 
+                                    name="city"
+                                    value={address.city}
+                                    onChange={handleAddressChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all placeholder:text-slate-400"
+                                    placeholder="City"
+                                    required
+                                    />
+                                <input 
+                                    type="text" 
+                                    name="zip"
+                                    value={address.zip}
+                                    onChange={handleAddressChange}
+                                    className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all placeholder:text-slate-400"
+                                    placeholder="Zip Code"
+                                    required
+                                    />
+                            </div>
+
+                            {/* Phone */}
+                            <div className="relative group">
+                                <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors"/>
+                                <input 
+                                type="tel" 
+                                name="phone"
+                                value={address.phone}
+                                onChange={handleAddressChange}
+                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all placeholder:text-slate-400"
+                                placeholder="Phone Number"
+                                required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <button
+                            type="submit"
+                            disabled={isProcessing}
+                            className="w-full text-white font-bold text-lg px-6 py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                            <CreditCard size={20} />
+                            {isProcessing ? "Processing..." : "Pay Now"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
           </div>
         </div>
       )}
 
+      <style>{`
+        @keyframes fadeInUp { 
+          from { opacity: 0; transform: translateY(20px); } 
+          to { opacity: 1; transform: translateY(0); } 
+        }
+        @keyframes scaleIn { 
+            from { opacity: 0; transform: scale(0.95); } 
+            to { opacity: 1; transform: scale(1); } 
+        }
+        @keyframes fadeIn { 
+            from { opacity: 0; } 
+            to { opacity: 1; } 
+        }
+        .animate-fadeInUp { 
+          animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+          animation-fill-mode: backwards; 
+        }
+        .animate-scaleIn {
+            animation: scaleIn 0.3s ease-out forwards;
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        /* Custom Scrollbar for Modal */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+      `}</style>
     </div>
   );
 }

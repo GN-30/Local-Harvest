@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 // Leaflet imports
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
@@ -6,6 +6,8 @@ import L from "leaflet";
 // Fix for default marker icon in React Leaflet
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
+
+import { AuthContext } from "../context/AuthContext";
 
 let DefaultIcon = L.icon({
   iconUrl: icon,
@@ -115,6 +117,7 @@ function SellerDashboard({
   onAddProduct,
   onRemoveProduct,
 }) {
+  const { user } = useContext(AuthContext); // Get current logged in user
   const [newProduct, setNewProduct] = useState({
     name: "",
     price: "",
@@ -148,6 +151,9 @@ function SellerDashboard({
       formData.append('address', newProduct.address);
       formData.append('contact_number', newProduct.contact_number);
       
+      // Pass the Seller's Email!
+      formData.append('seller_email', user?.email || "");
+
       if (newProduct.latitude) {
           formData.append('latitude', newProduct.latitude);
       }
@@ -195,7 +201,8 @@ function SellerDashboard({
   const getStockColor = (stock) => {
     if (stock > 15) return "text-emerald-900 bg-emerald-400/80";
     if (stock > 5) return "text-amber-900 bg-amber-400/80";
-    return "text-rose-900 bg-rose-400/80";
+    if (stock > 0) return "text-rose-900 bg-rose-400/80";
+    return "text-slate-500 bg-slate-200"; // Out of stock style
   };
 
   return (
@@ -306,7 +313,7 @@ function SellerDashboard({
                    type="file"
                    accept="image/*"
                    onChange={(e) => setNewProduct({ ...newProduct, image: e.target.files[0] })}
-                   className="w-full text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                   className="w-full text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
                  />
                </div>
 
@@ -359,7 +366,7 @@ function SellerDashboard({
                 <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                    className="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transform transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group cursor-pointer"
                 >
                     {isSubmitting ? (
                         <span className="animate-pulse">Processing...</span>
@@ -398,6 +405,7 @@ function SellerDashboard({
                     hover:bg-white/90 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-500/10 
                     transition-all duration-500 flex flex-col
                      ${removingId === product.id ? "animate-shatter pointer-events-none" : "animate-fadeInUp opacity-100 scale-100"}
+                     ${product.stock <= 0 ? "grayscale-0" : ""} 
                 `}
               >
                 <div className="flex justify-between items-start mb-4">
@@ -412,13 +420,17 @@ function SellerDashboard({
                             <span className="text-2xl">📦</span>
                         )}
                      </div>
-                     <button
-                        onClick={() => handleRemoveProduct(product.id)}
-                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all duration-300"
-                        title="Remove Product"
-                     >
-                        <TrashIcon />
-                     </button>
+                     
+                     {/* CONDITIONAL DELETE BUTTON */}
+                     {product.stock <= 0 && (
+                         <button
+                            onClick={() => handleRemoveProduct(product.id)}
+                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all duration-300 cursor-pointer"
+                            title="Remove Out of Stock Product"
+                         >
+                            <TrashIcon />
+                         </button>
+                     )}
                 </div>
                 
                 <h3 className="text-xl font-bold text-slate-800 mb-1 group-hover:text-emerald-700 transition-colors">
@@ -477,7 +489,7 @@ function SellerDashboard({
 
                 <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
                     <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${getStockColor(product.stock)}`}>
-                        {product.stock} in stock
+                        {product.stock > 0 ? `${product.stock} in stock` : "Out of Stock"}
                     </span>
                 </div>
               </div>

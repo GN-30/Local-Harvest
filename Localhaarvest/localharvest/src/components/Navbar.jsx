@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ShoppingCart, ChevronDown } from "lucide-react";
+import { ShoppingCart, ChevronDown, LogOut } from "lucide-react";
 
 import Logo from "../images/logo.jpg";
 
@@ -32,6 +32,12 @@ const Navbar = ({ cartCount, onLoginClick }) => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    setIsMenuOpen(false);
+    navigate("/");
+  };
 
   const navLinks = [
     { to: "/", text: "Home" },
@@ -110,6 +116,7 @@ const Navbar = ({ cartCount, onLoginClick }) => {
 
         {/* Right side Actions */}
         <div className="flex items-center gap-4 md:gap-6">
+            {/* Cart Icon */}
           <Link to="/orders" className="relative group">
             <ShoppingCart
               size={28}
@@ -126,14 +133,11 @@ const Navbar = ({ cartCount, onLoginClick }) => {
             )}
           </Link>
 
-          {/* Login / Logout Button */}
+          {/* Login / Logout Button (Desktop) */}
           {user && (
             <button
-              onClick={() => {
-                logout();
-                navigate("/");
-              }}
-              className="hidden md:block px-6 py-2.5 rounded-xl font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200"
+              onClick={handleLogout}
+              className="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 cursor-pointer"
             >
               Logout
             </button>
@@ -144,7 +148,7 @@ const Navbar = ({ cartCount, onLoginClick }) => {
       {/* Mobile Dropdown Menu */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out bg-white/95 backdrop-blur-xl shadow-inner ${
-          isMenuOpen ? "max-h-96" : "max-h-0"
+          isMenuOpen ? "max-h-[500px]" : "max-h-0"
         }`}
       >
         <ul className="flex flex-col items-start gap-2 p-4">
@@ -165,7 +169,19 @@ const Navbar = ({ cartCount, onLoginClick }) => {
               </NavLink>
             </li>
           ))}
-
+           
+           {/* Mobile Logout Button */}
+           {user && (
+             <li className="w-full mt-2 border-t border-slate-100 pt-2">
+                 <button 
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 p-3 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors font-semibold"
+                 >
+                    <LogOut size={20} />
+                    Logout
+                 </button>
+             </li>
+           )}
         </ul>
       </div>
 

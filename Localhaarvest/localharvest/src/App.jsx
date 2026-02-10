@@ -24,7 +24,22 @@ const ProtectedSellerRoute = ({ children }) => {
 };
 
 function App() {
-  const [cartItems, setCartItems] = useState([]);
+  // Initialize cart from localStorage
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem("cart");
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (error) {
+      console.error("Error parsing cart from localStorage:", error);
+      return [];
+    }
+  });
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cartItems));
+  }, [cartItems]);
+
   const [fallingItems] = useState(() => Array.from({ length: 25 }).map((_, i) => ({
     id: i,
     left: `${Math.random() * 100}%`,
@@ -176,7 +191,14 @@ function App() {
 
           <Route
             path="/shop"
-            element={<Shop products={products} addToCart={handleAddToCart} refreshProducts={fetchProducts} />}
+            element={
+              <Shop 
+                products={products} 
+                addToCart={handleAddToCart} 
+                refreshProducts={fetchProducts} 
+                onRemoveProduct={handleRemoveProduct} // Passed prop
+              />
+            }
           />
           <Route
             path="/sellers"

@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+// Lucide React Icons
+import { Trash2 } from "lucide-react";
 
 // Fix for default marker icon
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -34,7 +36,7 @@ const PhoneIcon = () => (
     </svg>
 );
 
-function Shop({ products, addToCart, refreshProducts }) {
+function Shop({ products, addToCart, refreshProducts, onRemoveProduct }) {
   // We can call refreshProducts on mount if needed, but App.js does it.
 
   return (
@@ -93,6 +95,22 @@ function Shop({ products, addToCart, refreshProducts }) {
                             OUT OF STOCK
                         </span>
                      </div>
+                )}
+
+                {/* Remove Button for Out of Stock Items */}
+                {isOutOfStock && onRemoveProduct && (
+                   <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          if(window.confirm("Remove this product?")) {
+                            onRemoveProduct(product.id);
+                          }
+                      }}
+                      className="absolute top-3 left-3 bg-white/90 p-2 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shadow-sm z-20"
+                      title="Remove Product"
+                   >
+                       <Trash2 size={16} />
+                   </button>
                 )}
               </div>
 
