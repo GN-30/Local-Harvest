@@ -67,14 +67,15 @@ function Orders({ orders, setCartItems, refreshProducts }) {
         alert("Please fill in all required fields.");
         return;
     }
-    // Proceed to payment after address validation
-    handlePayment();
+    // Proceed to Direct Order (Bypassing Payment Gateway for now)
+    handleDirectOrder();
   };
 
   // Notification Handler
   const sendSoldNotifications = async () => {
       try {
-          await fetch("http://localhost:3001/api/notifications/sold", {
+          // Send notification request to backend
+          const response = await fetch("http://localhost:3001/api/notifications/sold", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -82,13 +83,21 @@ function Orders({ orders, setCartItems, refreshProducts }) {
                   buyerDetails: address
               })
           });
+          
+          if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.details || errorData.error || "Failed to send notification via server");
+          }
+          return { success: true };
+
       } catch (e) {
           console.error("Failed to send notifications", e);
+          return { success: false, error: e.message };
       }
   };
 
-  // Razorpay payment function
-  const handlePayment = async () => {
+  // Direct Order function (Replaces Razorpay)
+  const handleDirectOrder = async () => {
     if (orders.length === 0) {
       alert("Your cart is empty!");
       return;
@@ -96,78 +105,28 @@ function Orders({ orders, setCartItems, refreshProducts }) {
 
     try {
       setIsProcessing(true);
-      setIsAddressModalOpen(false); // Close modal when starting payment logic
+      
+      // 1. Simulate Order Processing (Optional delay for UX)
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // 1️⃣ Create Razorpay order from backend
-      const res = await fetch(
-        "http://localhost:3001/api/payment/create-order",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: totalAmount,
-            currency: "INR",
-            orderId: new Date().getTime(),
-          }),
-        }
-      );
+      // 2. Send Email Notifications to Producers
+      const result = await sendSoldNotifications();
 
-      const data = await res.json();
-      if (!data.orderId) {
-        alert("Failed to create Razorpay order.");
-        setIsProcessing(false);
-        return;
+      if (result.success) {
+          // 3. Success!
+          alert("✅ Order Placed Successfully! The producers have been notified.");
+          setCartItems([]); // Clear cart
+          setIsAddressModalOpen(false); // Close modal
+      } else {
+          // SHOW DETAILED ERROR
+          alert(`⚠️ Order placed, but email notification failed.\nReason: ${result.error}\n\nPlease contact support.`);
+          setCartItems([]); // Still clear cart as order is "done" locally
+          setIsAddressModalOpen(false);
       }
 
-      // 2️⃣ Razorpay checkout options
-      const options = {
-        key: "rzp_test_yourkeyid", // 🔑 Replace correctly
-        amount: totalAmount * 100,
-        currency: "INR",
-        name: "LocalHarvest",
-        description: "Fresh Produce Order",
-        order_id: data.orderId,
-        handler: async function (response) {
-          try {
-            // 3️⃣ Verify payment with backend
-            const verifyRes = await fetch(
-              "http://localhost:3001/api/payment/verify",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(response),
-              }
-            );
-
-            const result = await verifyRes.json();
-            if (result.success) {
-              // 4️⃣ Send Email Notifications
-              await sendSoldNotifications();
-
-              alert("✅ Payment Successful! Producers have been notified.");
-              setCartItems([]); // clear cart
-            } else {
-              alert("❌ Payment verification failed.");
-            }
-          } catch (err) {
-            console.error("Error verifying payment:", err);
-            alert("Payment verification failed.");
-          }
-        },
-        prefill: {
-          name: address.name,
-          email: "", 
-          contact: address.phone
-        },
-        theme: { color: "#10b981" },
-      };
-
-      // 4️⃣ Open Razorpay popup
-      const rzp = new window.Razorpay(options);
-      rzp.open();
     } catch (error) {
-      console.error("Payment initiation failed:", error);
-      alert("Payment failed. Please try again.");
+      console.error("Order failed:", error);
+      alert("Order processing failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -289,7 +248,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
                     </button>
                     
                     <p className="text-xs text-center text-slate-400 mt-4">
-                        Secure Payment Powered by Razorpay
+                        Order notifications are sent to producers
                     </p>
                 </div>
             </div>
@@ -397,7 +356,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
                             className="w-full text-white font-bold text-lg px-6 py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
                             >
                             <CreditCard size={20} />
-                            {isProcessing ? "Processing..." : "Pay Now"}
+                            {isProcessing ? "Processing..." : "Place Order (Pay on Delivery)"}
                             </button>
                         </div>
                     </form>

@@ -384,7 +384,8 @@ app.post("/api/notifications/sold", async (req, res) => {
 
   } catch (error) {
     console.error("Notification error:", error);
-    res.status(500).json({ error: "Failed to send notifications" });
+    // RETURN DETAILED ERROR MESSAGE
+    res.status(500).json({ error: "Failed to send notifications", details: error.message });
   }
 });
 
