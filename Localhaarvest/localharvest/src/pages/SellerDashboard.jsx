@@ -412,7 +412,7 @@ function SellerDashboard({
                      <div className="w-12 h-12 rounded-xl bg-emerald-50/50 flex items-center justify-center overflow-hidden border border-emerald-100/50 transition-colors duration-300 group-hover:bg-emerald-100">
                         {product.image_url ? (
                             <img 
-                                src={`http://localhost:3001/${product.image_url}`} 
+                                src={`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/${product.image_url}`} 
                                 alt={product.name} 
                                 className="w-full h-full object-cover"
                             />

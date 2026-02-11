@@ -66,7 +66,7 @@ function Contact() {
     if (form.name && form.email && form.message) {
       try {
         // Send to backend
-        await fetch("http://localhost:3001/api/contact", {
+        await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/contact`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(form)

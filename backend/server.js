@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
@@ -8,8 +9,8 @@ const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
 const app = express();
-const PORT = 3001;
-const JWT_SECRET = "your_jwt_secret_here"; // Replace with process.env.JWT_SECRET in production
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_here";
 
 app.use(cors());
 app.use(express.json());
@@ -35,10 +36,11 @@ const upload = multer({ storage: storage });
 
 // --- DB Connection ---
 const pool = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "ramram",
-  database: "localharvest",
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "ramram",
+  database: process.env.DB_NAME || "localharvest",
+  port: process.env.DB_PORT || 3306
 });
 
 // --- Email Config (Nodemailer) ---
@@ -46,8 +48,8 @@ const pool = mysql.createPool({
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "gnsn1200@gmail.com", // TODO: Update this
-    pass: "vdup ptqh ljpd hhql",    // TODO: Update this (App Password if using Gmail)
+    user: process.env.EMAIL_USER || "gnsn1200@gmail.com",
+    pass: process.env.EMAIL_PASS || "vdup ptqh ljpd hhql",
   },
 });
 
@@ -70,8 +72,8 @@ const sendWelcomeEmail = async (email, name, role) => {
 
 // --- Razorpay Instance ---
 const razorpay = new Razorpay({
-  key_id: "rzp_test_1234567890abcdef", // replace with your Razorpay key
-  key_secret: "your_razorpay_secret",
+  key_id: process.env.RAZORPAY_KEY_ID || "rzp_test_1234567890abcdef",
+  key_secret: process.env.RAZORPAY_KEY_SECRET || "your_razorpay_secret",
 });
 
 // --- AUTH ROUTES ---
@@ -310,7 +312,7 @@ app.post("/api/contact", async (req, res) => {
               <p style="margin: 0; color: #166534; font-size: 14px;">Your Seller Access Code:</p>
               <h3 style="margin: 10px 0 0; color: #059669; letter-spacing: 2px;">${randomCode}</h3>
             </div>
-            <p>Please use this code on the <a href="http://localhost:5173/auth?role=seller&mode=signup" style="color: #059669;">Signup Page</a> to complete your registration.</p>
+            <p>Please use this code on the <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth?role=seller&mode=signup" style="color: #059669;">Signup Page</a> to complete your registration.</p>
             <br>
             <p>Best Regards,<br>The Local Harvest Team</p>
           </div>
@@ -418,7 +420,7 @@ app.post("/api/payment/verify", async (req, res) => {
     const body = razorpay_order_id + "|" + razorpay_payment_id;
 
     const expectedSignature = crypto
-      .createHmac("sha256", "your_razorpay_secret") // TODO: Use env var
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "your_razorpay_secret")
       .update(body.toString())
       .digest("hex");
 

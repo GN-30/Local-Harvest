@@ -59,7 +59,7 @@ function App() {
   // Fetch all products from backend
   const fetchProducts = async () => {
     try {
-      const response = await fetch("http://localhost:3001/api/products");
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/products`);
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -75,7 +75,7 @@ function App() {
       const headers = isFormData ? {} : { "Content-Type": "application/json" };
       const body = isFormData ? newProduct : JSON.stringify(newProduct);
 
-      const response = await fetch("http://localhost:3001/api/products", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/products`, {
         method: "POST",
         headers: headers,
         body: body,
@@ -97,7 +97,7 @@ function App() {
   const handleRemoveProduct = async (productId) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/api/products/${productId}`,
+        `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/products/${productId}`,
         { method: "DELETE" }
       );
 
@@ -123,7 +123,7 @@ function App() {
 
     try {
         // 2. Call backend to decrement stock
-        const response = await fetch(`http://localhost:3001/api/products/${item.id}/stock`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/products/${item.id}/stock`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ adjustment: -1 })

@@ -95,7 +95,7 @@ export default function AuthModal({ isOpen, onClose }) {
     if (!idToken) return alert("Google sign-in failed");
 
     try {
-      const res = await fetch("http://localhost:3001/api/auth/google", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
@@ -122,7 +122,7 @@ export default function AuthModal({ isOpen, onClose }) {
       : { name, email, password, role };
 
     try {
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

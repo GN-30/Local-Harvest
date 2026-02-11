@@ -12,7 +12,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
 
     try {
         // Restore stock
-        const response = await fetch(`http://localhost:3001/api/products/${itemToRemove.id}/stock`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/products/${itemToRemove.id}/stock`, {
              method: 'PUT',
              headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({ adjustment: 1 })
@@ -75,7 +75,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
   const sendSoldNotifications = async () => {
       try {
           // Send notification request to backend
-          const response = await fetch("http://localhost:3001/api/notifications/sold", {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/notifications/sold`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -186,7 +186,7 @@ function Orders({ orders, setCartItems, refreshProducts }) {
                         <div className="flex items-center gap-4">
                             <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
                                  {item.image_url ? 
-                                    <img src={`http://localhost:3001/${item.image_url}`} alt={item.name} className="w-full h-full object-cover"/> 
+                                    <img src={`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/${item.image_url}`} alt={item.name} className="w-full h-full object-cover"/> 
                                     : <span className="text-2xl">🥦</span>}
                             </div>
                             <div>

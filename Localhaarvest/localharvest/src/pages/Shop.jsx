@@ -74,7 +74,7 @@ function Shop({ products, addToCart, refreshProducts, onRemoveProduct }) {
               <div className="w-full aspect-[4/3] rounded-2xl bg-slate-100 mb-5 overflow-hidden relative shadow-inner">
                 {product.image_url ? (
                     <img
-                      src={`http://localhost:3001/${product.image_url}`}
+                      src={`${import.meta.env.VITE_API_URL || "http://localhost:3001"}/${product.image_url}`}
                       alt={product.name}
                       className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
                     />
