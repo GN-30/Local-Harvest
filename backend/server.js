@@ -51,6 +51,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER || "gnsn1200@gmail.com",
     pass: process.env.EMAIL_PASS || "vdup ptqh ljpd hhql",
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 // Helper to send email
@@ -114,7 +117,7 @@ app.post("/api/signup", async (req, res) => {
     res.status(201).json({ message: "User created successfully" });
   } catch (err) {
     console.error("Signup error:", err);
-    res.status(500).json({ error: "Signup failed" });
+    res.status(500).json({ message: "Signup failed", error: err.message });
   }
 });
 
@@ -365,9 +368,9 @@ app.post("/api/notifications/sold", async (req, res) => {
                         
                         <div style="background: #f9fafb; padding: 15px; border-radius: 8px; margin: 15px 0;">
                             <p><b>Product:</b> ${product.name}</p>
-                            <p><b>Buyer:</b> ${buyerDetails.name}</p>
-                            <p><b>Delivery Address:</b> ${buyerDetails.street}, ${buyerDetails.city}, ${buyerDetails.zip}</p>
-                            <p><b>Price:</b> ₹${item.price}</p>
+                            <p><b>Buyer:</b> ${buyerDetails.name || 'N/A'}</p>
+                            <p><b>Delivery Address:</b> ${buyerDetails.street || ''}, ${buyerDetails.city || ''}, ${buyerDetails.zip || ''}</p>
+                            <p><b>Price:</b> ₹${item.price || 'N/A'}</p>
                         </div>
                         
                         <p>Please prepare the item for pickup/delivery.</p>
@@ -483,6 +486,10 @@ app.listen(PORT, async () => {
       console.log("✅ Added 'seller_email' column to 'products'.");
     }
 
+    // --- Final Verification for all columns ---
+    const [finalCols] = await pool.query("SHOW COLUMNS FROM products");
+    const finalColNames = finalCols.map(c => c.Field);
+    console.log("🔍 Final Products Columns:", finalColNames);
 
   } catch (err) {
     console.error("❌ Database verification failed:", err);
